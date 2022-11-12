@@ -1,5 +1,5 @@
 const { createLogger, format } = require('winston')
-const LokiTransport = require('winston-loki')
+const LokiTransport = require('../index')
 
 describe('Integration tests', function () {
   it('Winston should accept LokiTransport', function () {

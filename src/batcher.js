@@ -1,10 +1,8 @@
 const url = require('url')
 const exitHook = require('async-exit-hook')
 
-const { logproto } = require('./proto')
 const protoHelpers = require('./proto/helpers')
 const req = require('./requests')
-let snappy = false
 
 /**
  * A batching transport layer for Grafana Loki
@@ -12,10 +10,6 @@ let snappy = false
  * @class Batcher
  */
 class Batcher {
-  loadSnappy () {
-    return require('snappy')
-  }
-
   /**
    * Creates an instance of Batcher.
    * Starts the batching loop if enabled.
@@ -47,23 +41,8 @@ class Batcher {
       streams: []
     }
 
-    // If snappy binaries have not been built, fallback to JSON transport
-    if (!this.options.json) {
-      try {
-        snappy = this.loadSnappy()
-      } catch (error) {
-        this.options.json = true
-      }
-      if (!snappy) {
-        this.options.json = true
-      }
-    }
-
     // Define the content type headers for the POST request based on the data type
-    this.contentType = 'application/x-protobuf'
-    if (this.options.json) {
-      this.contentType = 'application/json'
-    }
+    this.contentType = 'application/json'
 
     // If batching is enabled, run the loop
     this.options.batching && this.run()
@@ -99,11 +78,6 @@ class Batcher {
     // If user has decided to replace the given timestamps with a generated one, generate it
     if (this.options.replaceTimestamp || noTimestamp) {
       logEntry.entries[0].ts = Date.now()
-    }
-
-    // If protobuf is the used data type, construct the timestamps
-    if (!this.options.json) {
-      logEntry = protoHelpers.createProtoTimestamps(logEntry)
     }
 
     // If batching is not enabled, push the log immediately to Loki API
@@ -149,47 +123,16 @@ class Batcher {
       if (this.batch.streams.length === 0 && !logEntry) {
         resolve()
       } else {
-        let reqBody
-
         // If the data format is JSON, there's no need to construct a buffer
-        if (this.options.json) {
-          let preparedJSONBatch
-          if (logEntry !== undefined) {
-            // If a single logEntry is given, wrap it according to the batch format
-            preparedJSONBatch = protoHelpers.prepareJSONBatch({ streams: [logEntry] })
-          } else {
-            // Stringify the JSON ready for transport
-            preparedJSONBatch = protoHelpers.prepareJSONBatch(this.batch)
-          }
-          reqBody = JSON.stringify(preparedJSONBatch)
+        let preparedJSONBatch
+        if (logEntry !== undefined) {
+          // If a single logEntry is given, wrap it according to the batch format
+          preparedJSONBatch = protoHelpers.prepareJSONBatch({ streams: [logEntry] })
         } else {
-          try {
-            let batch
-            if (logEntry !== undefined) {
-              // If a single logEntry is given, wrap it according to the batch format
-              batch = { streams: [logEntry] }
-            } else {
-              batch = this.batch
-            }
-
-            const preparedBatch = protoHelpers.prepareProtoBatch(batch)
-
-            // Check if the batch can be encoded in Protobuf and is correct format
-            const err = logproto.PushRequest.verify(preparedBatch)
-
-            // Reject the promise if the batch is not of correct format
-            if (err) reject(err)
-
-            // Create the PushRequest object
-            const message = logproto.PushRequest.create(preparedBatch)
-            // Encode the PushRequest object and create the binary buffer
-            const buffer = logproto.PushRequest.encode(message).finish()
-            // Compress the buffer with snappy
-            reqBody = snappy.compressSync(buffer)
-          } catch (err) {
-            reject(err)
-          }
+          // Stringify the JSON ready for transport
+          preparedJSONBatch = protoHelpers.prepareJSONBatch(this.batch)
         }
+        const reqBody = JSON.stringify(preparedJSONBatch)
 
         // Send the data to Grafana Loki
         req.post(this.url, this.contentType, this.options.headers, reqBody, this.options.timeout)

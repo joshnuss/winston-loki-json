@@ -1,5 +1,5 @@
 {
-  "name": "winston-loki",
+  "name": "winston-loki-json",
   "version": "6.0.6",
   "description": "A Winston transport for Grafana Loki",
   "keywords": [
@@ -53,9 +53,6 @@
     "btoa": "^1.2.1",
     "protobufjs": "^6.8.8",
     "winston-transport": "^4.3.0"
-  },
-  "optionalDependencies": {
-    "snappy": "7.1.1"
   },
   "devDependencies": {
     "coveralls": "^3.0.2",

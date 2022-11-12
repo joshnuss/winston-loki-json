@@ -1,5 +1,5 @@
 const { createLogger } = require('winston')
-const LokiTransport = require('winston-loki')
+const LokiTransport = require('../index')
 const fixtures = require('./fixtures.json')
 
 describe('Integration tests', function () {
